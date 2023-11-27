@@ -133,11 +133,11 @@ void printDataAtoms (FILE *output, BEAD_POSITIONS **beads, int nChains, int nBea
 	}
 }
 
-BONDS *generateBonds (int nChains, int nBeads, int nBonds, BONDS *polymerBonds)
+BONDS *generateBonds (int nChains, int nBeads, int nBonds, BONDS *polymerBonds, int nAtoms)
 {
 	int currentBondID = 0, bondType = 1;
 
-	for (int i = 0; i < nBonds; ++i)
+	for (int i = 0; i < nAtoms; ++i)
 	{
 		if ((i + 1) % nBeads != 0)
 		{
@@ -203,7 +203,7 @@ int main(int argc, char const *argv[])
 	int nAtoms = nBeads * nChains;
 	printDataHeader (output, nAtoms, nBonds, boxLength);
 	printDataAtoms (output, beads, nChains, nBeads);
-	polymerBonds = generateBonds (nChains, nBeads, nBonds, polymerBonds);
+	polymerBonds = generateBonds (nChains, nBeads, nBonds, polymerBonds, nAtoms);
 	printDataBonds (output, polymerBonds, nBonds);
 
 	fclose (output);

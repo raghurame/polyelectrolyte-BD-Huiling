@@ -1,3 +1,3 @@
 all:
 	gcc -o genRandomChain genRandomChain.c -lm -Wall
-	./genRandomChain 60 1 20 100
+	./genRandomChain 60 1 300 300
