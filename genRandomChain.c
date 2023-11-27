@@ -119,8 +119,16 @@ void printDataAtoms (FILE *output, BEAD_POSITIONS **beads, int nChains, int nBea
 	{
 		for (int j = 0; j < nBeads; ++j)
 		{
-			fprintf(output, "%d %d 1 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
-			sino++;
+			if ((i + 1) % 2 == 0)
+			{
+				fprintf(output, "%d %d 1 1.0 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
+				sino++;
+			}
+			else
+			{
+				fprintf(output, "%d %d 1 -1.0 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
+				sino++;
+			}
 		}
 	}
 }
