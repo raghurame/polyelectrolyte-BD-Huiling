@@ -28,24 +28,34 @@ BEAD_POSITIONS **generatePositions (BEAD_POSITIONS **beads, int nBeads, float bo
 	for (int i = 1; i < nBeads; ++i)
 	{
 		randomAngle1 = rand() % 360;
-		randomAngle1 = randomAngle1 / 57.2958;
 		randomAngle2 = rand() % 360;
+		randomAngle1 = randomAngle1 / 57.2958;
 		randomAngle2 = randomAngle2 / 57.2958;
 
-		beads[currentChain][i].x = beads[currentChain][i - 1].x + bondLength * sin (randomAngle1);
-		beads[currentChain][i].y = beads[currentChain][i - 1].y + bondLength * cos (randomAngle1);
+		beads[currentChain][i].x = beads[currentChain][i - 1].x + cos (randomAngle2) * bondLength * cos (randomAngle1);
+		beads[currentChain][i].y = beads[currentChain][i - 1].y + bondLength * sin (randomAngle1);
 		beads[currentChain][i].z = beads[currentChain][i - 1].z + bondLength * sin (randomAngle2);
-
 	}
 
 	return beads;
 }
 
-BEAD_POSITIONS generateInitialPositions (BEAD_POSITIONS initPosition, float boxLength)
+BEAD_POSITIONS generateRandomInitialPositions (BEAD_POSITIONS initPosition, float boxLength)
 {
 	initPosition.x = fmod ((float)rand (), (float)boxLength);
 	initPosition.y = fmod ((float)rand (), (float)boxLength);
 	initPosition.z = fmod ((float)rand (), (float)boxLength);
+
+	return initPosition;
+}
+
+BEAD_POSITIONS generatePeriodicInitialPositions (BEAD_POSITIONS initPosition, float boxLength, bool *periodicChainPlacement)
+{
+	(*periodicChainPlacement) = true;
+
+	initPosition.x = boxLength / 2;
+	initPosition.y = boxLength / 2;
+	initPosition.z = boxLength / 2;
 
 	return initPosition;
 }
@@ -166,6 +176,42 @@ void printDataBonds (FILE *output, BONDS *polymerBonds, int nBonds)
 	}
 }
 
+void printXYZ (BEAD_POSITIONS **beads, int nChains, int nBeads)
+{
+	FILE *getCurrentDate;
+	getCurrentDate = popen ("date", "r");
+
+	char lineString[3000], firstLine[3000];
+	fgets (lineString, 3000, getCurrentDate);
+
+	FILE *outputXYZ;
+	outputXYZ = fopen ("chain.xyz", "w");
+
+	fprintf(outputXYZ, "%d\n", nBeads * nChains);
+	fprintf(outputXYZ, "XYZ file created on %s", lineString);
+
+	for (int i = 0; i < nChains; ++i)
+	{
+		for (int j = 0; j < nBeads; ++j)
+		{
+			fprintf(outputXYZ, "C %f %f %f\n", beads[i][j].x, beads[i][j].y, beads[i][j].z);
+		}
+	}
+
+	fclose (outputXYZ);
+}
+
+float computeEndToEndDistance (float endToEndDistance, BEAD_POSITIONS **beads, int currentChain, int nBeads)
+{
+	endToEndDistance = sqrt (
+		(beads[currentChain][0].x - beads[currentChain][nBeads - 1].x) * (beads[currentChain][0].x - beads[currentChain][nBeads - 1].x) +
+		(beads[currentChain][0].y - beads[currentChain][nBeads - 1].y) * (beads[currentChain][0].y - beads[currentChain][nBeads - 1].y) +
+		(beads[currentChain][0].z - beads[currentChain][nBeads - 1].z) * (beads[currentChain][0].z - beads[currentChain][nBeads - 1].z)
+		);
+	
+	return endToEndDistance;
+}
+
 int main(int argc, char const *argv[])
 {
 	FILE *output;
@@ -190,13 +236,22 @@ int main(int argc, char const *argv[])
 
 	srand(time(0));
 
-	bool chainFinalized;
+	bool chainFinalized, periodicChainPlacement = false;
+	float endToEndDistance;
 
 	for (int i = 0; i < nChains; )
 	{
-		initPosition = generateInitialPositions (initPosition, boxLength);
+		// initPosition = generateRandomInitialPositions (initPosition, boxLength);
+		initPosition = generatePeriodicInitialPositions (initPosition, boxLength, &periodicChainPlacement);
+
 		beads = generatePositions (beads, nBeads, bondLength, initPosition, i);
+
 		chainFinalized = checkChainBoundary (beads, i, nBeads, boxLength, chainFinalized);
+
+		if (periodicChainPlacement)
+		{
+			endToEndDistance = computeEndToEndDistance (endToEndDistance, beads, i, nBeads);
+		}
 
 		if (chainFinalized) {
 			++i; }
@@ -207,6 +262,8 @@ int main(int argc, char const *argv[])
 	printDataAtoms (output, beads, nChains, nBeads);
 	polymerBonds = generateBonds (nChains, nBeads, nBonds, polymerBonds, nAtoms);
 	printDataBonds (output, polymerBonds, nBonds);
+
+	printXYZ (beads, nChains, nBeads);
 
 	fclose (output);
 	return 0;
