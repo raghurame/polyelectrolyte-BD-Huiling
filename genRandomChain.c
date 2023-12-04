@@ -8,6 +8,7 @@
 
 typedef struct position
 {
+	int molType;
 	float x, y, z;
 } BEAD_POSITIONS;
 
@@ -16,13 +17,14 @@ typedef struct bonds
 	int id, atom1, atom2, bondType;
 } BONDS;
 
-BEAD_POSITIONS **generatePositions (BEAD_POSITIONS **beads, int nBeads, float bondLength, BEAD_POSITIONS initPosition, int currentChain)
+BEAD_POSITIONS **generatePositions (BEAD_POSITIONS **beads, int nBeads, float bondLength, BEAD_POSITIONS initPosition, int currentChain, int currentMolType)
 {
 	beads[currentChain][0].x = initPosition.x;
 	beads[currentChain][0].y = initPosition.y;
 	beads[currentChain][0].z = initPosition.z;
+	beads[currentChain][0].molType = currentMolType;
 
-	srand(time(0));
+	// srand(time(0));
 	float randomAngle1, randomAngle2;
 
 	for (int i = 1; i < nBeads; ++i)
@@ -35,6 +37,8 @@ BEAD_POSITIONS **generatePositions (BEAD_POSITIONS **beads, int nBeads, float bo
 		beads[currentChain][i].x = beads[currentChain][i - 1].x + cos (randomAngle2) * bondLength * cos (randomAngle1);
 		beads[currentChain][i].y = beads[currentChain][i - 1].y + bondLength * sin (randomAngle1);
 		beads[currentChain][i].z = beads[currentChain][i - 1].z + bondLength * sin (randomAngle2);
+
+		beads[currentChain][i].molType = currentMolType;
 	}
 
 	return beads;
@@ -120,45 +124,88 @@ void printDataHeader (FILE *output, int nAtoms, int nBonds, float boxLength)
 	fprintf(output, "%s\n\n%d atoms\n%d atom types\n%d bonds\n%d bond types\n\n0 %.3f xlo xhi\n0 %.3f ylo yhi\n0 %.3f zlo zhi\n\nMasses\n\n1 1\n\nAtoms\n\n", firstLine, nAtoms, 1, nBonds, 1, boxLength, boxLength, boxLength);
 }
 
-void printDataAtoms (FILE *output, BEAD_POSITIONS **beads, int nChains, int nBeads)
+void printDataAtoms (FILE *output, BEAD_POSITIONS **beads1, int nBeads1, BEAD_POSITIONS **beads2, int nBeads2, int nChains)
 {
-	int sino = 1;
+	FILE *getCurrentDate;
+	getCurrentDate = popen ("date", "r");
+
+	char lineString[3000], firstLine[3000];
+	fgets (lineString, 3000, getCurrentDate);
+
+	FILE *outputXYZ;
+	outputXYZ = fopen ("chain.xyz", "w");
+	int nBeads = nBeads1 + nBeads2;
+
+	fprintf(outputXYZ, "%d\n", nBeads * nChains);
+	fprintf(outputXYZ, "XYZ file created on %s", lineString);
+
+	int sino = 1, currentAtomID = 0, currentPolycation = 0, currentPolyanion = 0;
 
 	printf("Printing atomic coordinates..\n");
 	for (int i = 0; i < nChains; ++i)
 	{
-		for (int j = 0; j < nBeads; ++j)
+		if (i % 2 == 0)
 		{
-			if ((i + 1) % 2 == 0)
+			for (int j = 0; j < nBeads1; ++j)
 			{
-				// fprintf(output, "%d %d 1 1.0 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
-				fprintf(output, "%d %d 1 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
-				sino++;
+				currentAtomID++;
+				fprintf(output, "%d %d 1 %f %f %f\n", currentAtomID, beads1[currentPolycation][j].molType, beads1[currentPolycation][j].x, beads1[currentPolycation][j].y, beads1[currentPolycation][j].z);
+				fprintf(outputXYZ, "C %f %f %f\n", beads1[currentPolycation][j].x, beads1[currentPolycation][j].y, beads1[currentPolycation][j].z);
 			}
-			else
+			currentPolycation++;
+		}
+		else
+		{
+			for (int j = 0; j < nBeads2; ++j)
 			{
-				// fprintf(output, "%d %d 1 -1.0 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
-				fprintf(output, "%d %d 2 %f %f %f\n", sino, (i + 1), beads[i][j].x, beads[i][j].y, beads[i][j].z);
-				sino++;
+				currentAtomID++;
+				fprintf(output, "%d %d 2 %f %f %f\n", currentAtomID, beads2[currentPolyanion][j].molType, beads2[currentPolyanion][j].x, beads2[currentPolyanion][j].y, beads2[currentPolyanion][j].z);
+				fprintf(outputXYZ, "N %f %f %f\n", beads2[currentPolyanion][j].molType, beads2[currentPolyanion][j].x, beads2[currentPolyanion][j].y, beads2[currentPolyanion][j].z);
 			}
+			currentPolyanion++;
 		}
 	}
 }
 
-BONDS *generateBonds (int nChains, int nBeads, int nBonds, BONDS *polymerBonds, int nAtoms)
+BONDS *generateBonds (int nChains, BEAD_POSITIONS **beads1, int nBeads1, BEAD_POSITIONS **beads2, int nBeads2, int nBonds, BONDS *polymerBonds, int nAtoms)
 {
-	int currentBondID = 0, bondType = 1;
+	int currentBondID = 0, bondType = 1, currentPolyanion = 0, currentPolycation = 0, currentAtomID = 0;
 
-	for (int i = 0; i < nAtoms; ++i)
+	for (int i = 0; i < nChains; ++i)
 	{
-		if ((i + 1) % nBeads != 0)
+		if (i % 2 == 0)
 		{
-			polymerBonds[currentBondID].id = currentBondID + 1;
-			polymerBonds[currentBondID].bondType = 1;
-			polymerBonds[currentBondID].atom1 = i + 1;
-			polymerBonds[currentBondID].atom2 = i + 2;
+			for (int j = 0; j < nBeads1; ++j)
+			{
+				currentAtomID++;
+				if (j > 0)
+				{
+					currentBondID++;
+					polymerBonds[currentBondID - 1].id = currentBondID;
+					polymerBonds[currentBondID - 1].bondType = 1;
+					polymerBonds[currentBondID - 1].atom1 = currentAtomID - 1;
+					polymerBonds[currentBondID - 1].atom2 = currentAtomID;
+				}
+			}
 
-			currentBondID++;
+			currentPolycation++;
+		}
+		else
+		{
+			for (int j = 0; j < nBeads2; ++j)
+			{
+				currentAtomID++;
+				if (j > 0)
+				{
+					currentBondID++;
+					polymerBonds[currentBondID - 1].id = currentBondID;
+					polymerBonds[currentBondID - 1].bondType = 2;
+					polymerBonds[currentBondID - 1].atom1 = currentAtomID - 1;
+					polymerBonds[currentBondID - 1].atom2 = currentAtomID;
+				}
+			}
+
+			currentPolyanion++;
 		}
 	}
 
@@ -174,31 +221,6 @@ void printDataBonds (FILE *output, BONDS *polymerBonds, int nBonds)
 	{
 		fprintf(output, "%d %d %d %d\n", polymerBonds[i].id, polymerBonds[i].bondType, polymerBonds[i].atom1, polymerBonds[i].atom2);
 	}
-}
-
-void printXYZ (BEAD_POSITIONS **beads, int nChains, int nBeads)
-{
-	FILE *getCurrentDate;
-	getCurrentDate = popen ("date", "r");
-
-	char lineString[3000], firstLine[3000];
-	fgets (lineString, 3000, getCurrentDate);
-
-	FILE *outputXYZ;
-	outputXYZ = fopen ("chain.xyz", "w");
-
-	fprintf(outputXYZ, "%d\n", nBeads * nChains);
-	fprintf(outputXYZ, "XYZ file created on %s", lineString);
-
-	for (int i = 0; i < nChains; ++i)
-	{
-		for (int j = 0; j < nBeads; ++j)
-		{
-			fprintf(outputXYZ, "C %f %f %f\n", beads[i][j].x, beads[i][j].y, beads[i][j].z);
-		}
-	}
-
-	fclose (outputXYZ);
 }
 
 float computeEndToEndDistance (float endToEndDistance, BEAD_POSITIONS **beads, int currentChain, int nBeads)
@@ -217,53 +239,63 @@ int main(int argc, char const *argv[])
 	FILE *output;
 	output = fopen ("chain.data", "w");
 
-	int nBeads = atoi (argv[1]);
-	float bondLength = atof (argv[2]);
-	int nChains = atoi (argv[3]);
-	float boxLength = atof (argv[4]);
+	int nBeads1 = atoi (argv[1]), nBeads2 = atoi (argv[2]), nBeads = nBeads1 + nBeads2;
+	float bondLength1 = atof (argv[3]), bondLength2 = atof (argv[4]);
+	int nChains = atoi (argv[5]), nPolycation = ceil (nChains / 2), nPolyanion = ceil (nChains / 2);
+	float boxLength = atof (argv[6]);
 
-	BEAD_POSITIONS **beads, initPosition;
-	beads = (BEAD_POSITIONS **) malloc (nChains * sizeof (BEAD_POSITIONS *));
+	BEAD_POSITIONS **beads1, **beads2, initPosition;
+	beads1 = (BEAD_POSITIONS **) malloc (nPolycation * sizeof (BEAD_POSITIONS *));
+	beads2 = (BEAD_POSITIONS **) malloc (nPolyanion * sizeof (BEAD_POSITIONS *));
 
 	for (int i = 0; i < nChains; ++i)
 	{
-		beads[i] = (BEAD_POSITIONS *) malloc (nBeads * sizeof (BEAD_POSITIONS));
+		beads1[i] = (BEAD_POSITIONS *) malloc (nBeads1 * sizeof (BEAD_POSITIONS));
+		beads2[i] = (BEAD_POSITIONS *) malloc (nBeads2 * sizeof (BEAD_POSITIONS));
 	}
 
 	BONDS *polymerBonds;
-	int nBonds = (nBeads - 1) * nChains;
+	int nBonds1 = (nBeads1 - 1) * nPolycation, nBonds2 = (nBeads2 - 1) * nPolyanion, nBonds = nBonds1 + nBonds2;
 	polymerBonds = (BONDS *) malloc (nBonds * sizeof (BONDS));
 
 	srand(time(0));
 
 	bool chainFinalized, periodicChainPlacement = false;
-	float endToEndDistance;
+	float maxEndToEndDistance = 0, currentEndToEndDistance;
+
+	int currentPolycation = 0, currentPolyanion = 0;
 
 	for (int i = 0; i < nChains; )
 	{
 		// initPosition = generateRandomInitialPositions (initPosition, boxLength);
 		initPosition = generatePeriodicInitialPositions (initPosition, boxLength, &periodicChainPlacement);
 
-		beads = generatePositions (beads, nBeads, bondLength, initPosition, i);
-
-		chainFinalized = checkChainBoundary (beads, i, nBeads, boxLength, chainFinalized);
-
-		if (periodicChainPlacement)
-		{
-			endToEndDistance = computeEndToEndDistance (endToEndDistance, beads, i, nBeads);
-		}
+		if (i % 2 == 0) {
+			beads1 = generatePositions (beads1, nBeads1, bondLength1, initPosition, currentPolycation, 1);
+			chainFinalized = checkChainBoundary (beads1, currentPolycation, nBeads1, boxLength, chainFinalized);
+			currentEndToEndDistance = computeEndToEndDistance (currentEndToEndDistance, beads1, currentPolycation, nBeads1);
+			if (currentEndToEndDistance > maxEndToEndDistance) {
+				maxEndToEndDistance = currentEndToEndDistance; }
+			currentPolycation++; }
+		else {
+			beads2 = generatePositions (beads2, nBeads2, bondLength2, initPosition, currentPolyanion, 2);
+			chainFinalized = checkChainBoundary (beads2, currentPolyanion, nBeads2, boxLength, chainFinalized);
+			currentEndToEndDistance = computeEndToEndDistance (currentEndToEndDistance, beads2, currentPolyanion, nBeads2);
+			if (currentEndToEndDistance > maxEndToEndDistance) {
+				maxEndToEndDistance = currentEndToEndDistance; }
+			currentPolyanion++; }
 
 		if (chainFinalized) {
 			++i; }
 	}
 
-	int nAtoms = nBeads * nChains;
-	printDataHeader (output, nAtoms, nBonds, boxLength);
-	printDataAtoms (output, beads, nChains, nBeads);
-	polymerBonds = generateBonds (nChains, nBeads, nBonds, polymerBonds, nAtoms);
-	printDataBonds (output, polymerBonds, nBonds);
+	currentPolycation = 0; currentPolyanion = 0;
 
-	printXYZ (beads, nChains, nBeads);
+	int nAtoms = (nBeads1 * nPolycation) + (nBeads2 * nPolyanion);
+	printDataHeader (output, nAtoms, nBonds, boxLength);
+	printDataAtoms (output, beads1, nBeads1, beads2, nBeads2, nChains);
+	polymerBonds = generateBonds (nChains, beads1, nBeads1, beads2, nBeads2, nBonds, polymerBonds, nAtoms);
+	printDataBonds (output, polymerBonds, nBonds);
 
 	fclose (output);
 	return 0;
