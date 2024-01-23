@@ -248,12 +248,6 @@ float computeEndToEndDistance (float endToEndDistance, BEAD_POSITIONS **beads, i
 		}
 	}
 
-/*	endToEndDistance = sqrt (
-		(beads[currentChain][0].x - beads[currentChain][nBeads - 1].x) * (beads[currentChain][0].x - beads[currentChain][nBeads - 1].x) +
-		(beads[currentChain][0].y - beads[currentChain][nBeads - 1].y) * (beads[currentChain][0].y - beads[currentChain][nBeads - 1].y) +
-		(beads[currentChain][0].z - beads[currentChain][nBeads - 1].z) * (beads[currentChain][0].z - beads[currentChain][nBeads - 1].z)
-		);
-*/	
 	return endToEndDistance;
 }
 
@@ -283,10 +277,7 @@ void packPolymers (BEAD_POSITIONS ***beads1, int nBeads1, BEAD_POSITIONS ***bead
 	for (int i = 0; i < nChains; ++i)
 	{
 		com = computeCenterOfMass (com, (*beads1), nBeads1, i);
-		printf("%f %f %f\n", com.x, com.y, com.z);
 		com = computeCenterOfMass (com, (*beads2), nBeads2, i);
-		printf("%f %f %f\n", com.x, com.y, com.z);
-		usleep (100000);
 	}
 }
 
